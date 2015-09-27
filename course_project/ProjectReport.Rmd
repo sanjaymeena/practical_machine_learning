@@ -1,0 +1,189 @@
+---
+title: "Practical Machine Learning Project"
+author: "Sanjay Meena"
+date: "09/27/2015"
+output: html_document
+---
+
+
+# Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, We  will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+
+
+## Goal 
+
+* To predict the manner in which participants did the exercise. This is the "classe" variable in the training set. 
+    * Class A : Exactly according to the specification , 
+    * Class B : Throwing the elbows to the front (Class B), 
+    * Class C : lifting the dumbbell only halfway 
+    * Class D : lowering the dumbbell only halfway 
+    * Class E : throwing the hips to the front .
+      
+
+* Create a report describing how we built your model, how we used cross validation, what we think the expected out of sample error is, and why we made the choices we did.
+
+* Test prediction model to predict 20 different test cases. 
+
+
+# Steps
+
+## Loading Libraries and Setting seed
+In order to reproduce the same results,  We should use the following packages and also use the pseudo random number seed. 
+
+```{r }
+library(caret)
+library(rpart)
+library(randomForest)
+library(RColorBrewer)
+library(rattle)
+library(rpart.plot)
+
+# Set the seed to ensure replicable results
+set.seed(2000)
+
+```
+
+## Getting the data
+
+### Download the data
+
+```{r }
+
+trainUrl <-"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+trainFile <- "./data/pml-training.csv"
+testFile  <- "./data/pml-testing.csv"
+
+if (!file.exists("./data")) {
+  dir.create("./data")
+}
+if (!file.exists(trainFile)) {
+  download.file(trainUrl, destfile=trainFile, method="curl")
+}
+if (!file.exists(testFile)) {
+  download.file(testUrl, destfile=testFile, method="curl")
+}
+
+```
+
+### Load the data
+
+```{r }
+trainData <- read.csv("./data/pml-training.csv")
+testData <- read.csv("./data/pml-testing.csv")
+#dim(trainData); dim(trainData)
+#str(trainData)
+```
+
+
+
+## Clean the data
+
+
+###  Remove name column as it is not relevant
+```{r }
+trainData <- trainData[c(-1)]
+```
+
+### Remove the near zero variance variables
+
+```{r }
+# Remove nzv from train data
+trainDataNZV <- nearZeroVar(trainData, saveMetrics=TRUE)
+trainData <- trainData[,trainDataNZV$nzv==FALSE]
+# remove nzv from test data
+testDataNZV <- nearZeroVar(testData, saveMetrics=TRUE)
+testData <- testData[,testDataNZV$nzv==FALSE]
+```
+
+### Remove missing Values
+
+We can either remove all the columns with missing values or remove columns which have NA values above some threshold. For simplicity, we will simply remove columns which contained NA values. 
+
+```{r }
+
+trainData <- trainData[, colSums(is.na(trainData)) == 0] 
+testData <- testData[, colSums(is.na(testData)) == 0] 
+```
+
+
+## Cross Validation : Slice the Training data into 70% training and 30% testing
+
+Cross-validation is important in guarding against Type 3 Errors. 
+
+```{r }
+inTrain <- createDataPartition(trainCleaned$classe, p=0.70, list=F)
+trainData <- trainCleaned[inTrain, ]
+crossValidationData <- trainCleaned[-inTrain, ]
+
+```
+
+# Machine Learning  Models
+
+We can use different machine learning models on the training data. Some good ones are Random Forests, Decision Trees etc . For this project, we will use decision trees. 
+
+## Using Decision Trees
+
+
+### Training the Model
+
+```{r}
+decision_tree_model <- rpart(classe ~ ., data=trainData, method="class")
+
+```
+
+### Plot of the model
+```{r}
+
+fancyRpartPlot(decision_tree_model)
+```
+
+### Prediction on the cross validation set
+```{r}
+predictions_using_decision_tree <- predict(decision_tree_model, crossValidationData, type = "class")
+```
+
+```{r}
+confusion_matrix <- confusionMatrix(predictions_using_decision_tree,crossValidationData$classe)
+confusion_matrix
+```
+
+
+
+### Out of Sample Error
+
+We calculate the out of sample error. We do this by subtracting 1 from the accuracy for predictions made against the cross-validation set. 
+
+```{r}
+Out_of_Sample_Error = 1- .8703
+Out_of_Sample_Error
+```
+
+The out of sample error is around 13%. It can be  lower using better algorithms like Random Forest. 
+
+### Prediction results on the test data
+```{r}
+predictions_test_data <- predict(decision_tree_model, testData, type = "class")
+predictions_test_data
+```
+
+
+### Write the results to a text file for submission
+
+```{r}
+# Writing predicitons for submission
+#pml_write_files = function(x){
+ # n = length(x)
+ # for(i in 1:n){
+ #   filename = paste0("problem_id_",i,".txt")
+ #   write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+ # }
+#}
+
+#pml_write_files(predictionB2)
+```
+
